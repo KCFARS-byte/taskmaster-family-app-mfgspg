@@ -32,39 +32,66 @@ export default function AddTask() {
   const children = taskStore.getChildren();
   const parents = taskStore.getParents();
 
-  const handleSave = () => {
-    if (!title.trim()) {
-      Alert.alert('Error', 'Please enter a task title');
-      return;
+  const handleSave = async () => {
+    try {
+      if (!title.trim()) {
+        Alert.alert('Error', 'Please enter a task title');
+        return;
+      }
+
+      if (!assignedTo) {
+        Alert.alert('Error', 'Please select who to assign this task to');
+        return;
+      }
+
+      const firstParent = parents[0];
+      if (!firstParent) {
+        Alert.alert('Error', 'No parent found to create task');
+        return;
+      }
+
+      const newTask = taskStore.addTask({
+        title: title.trim(),
+        description: description.trim() || undefined,
+        assignedTo,
+        createdBy: firstParent.id,
+        dueDate,
+        isCompleted: false,
+        repeatType,
+        category,
+        priority,
+        points: parseInt(points) || 0,
+      });
+
+      console.log('Task created successfully:', newTask.title);
+
+      Alert.alert('Success', 'Task created successfully!', [
+        { 
+          text: 'OK', 
+          onPress: () => {
+            try {
+              router.back();
+            } catch (error) {
+              console.error('Error navigating back:', error);
+            }
+          }
+        }
+      ]);
+    } catch (error) {
+      console.error('Error creating task:', error);
+      Alert.alert('Error', 'Failed to create task. Please try again.');
     }
+  };
 
-    if (!assignedTo) {
-      Alert.alert('Error', 'Please select who to assign this task to');
-      return;
+  const handleDateChange = (event: any, selectedDate?: Date) => {
+    try {
+      setShowDatePicker(false);
+      if (selectedDate) {
+        setDueDate(selectedDate);
+      }
+    } catch (error) {
+      console.error('Error handling date change:', error);
     }
-
-    const firstParent = parents[0];
-    if (!firstParent) {
-      Alert.alert('Error', 'No parent found to create task');
-      return;
-    }
-
-    taskStore.addTask({
-      title: title.trim(),
-      description: description.trim() || undefined,
-      assignedTo,
-      createdBy: firstParent.id,
-      dueDate,
-      isCompleted: false,
-      repeatType,
-      category,
-      priority,
-      points: parseInt(points) || 0,
-    });
-
-    Alert.alert('Success', 'Task created successfully!', [
-      { text: 'OK', onPress: () => router.back() }
-    ]);
   };
 
   const repeatOptions: { value: RepeatType; label: string }[] = [
@@ -91,7 +118,13 @@ export default function AddTask() {
     <SafeAreaView style={commonStyles.container}>
       <View style={commonStyles.header}>
         <View style={commonStyles.spaceBetween}>
-          <TouchableOpacity onPress={() => router.back()}>
+          <TouchableOpacity onPress={() => {
+            try {
+              router.back();
+            } catch (error) {
+              console.error('Error navigating back:', error);
+            }
+          }}>
             <Icon name="arrow-back" size={24} color={colors.text} />
           </TouchableOpacity>
           <Text style={commonStyles.title}>Add Task</Text>
@@ -348,12 +381,7 @@ export default function AddTask() {
           value={dueDate}
           mode="datetime"
           display="default"
-          onChange={(event, selectedDate) => {
-            setShowDatePicker(false);
-            if (selectedDate) {
-              setDueDate(selectedDate);
-            }
-          }}
+          onChange={handleDateChange}
         />
       )}
     </SafeAreaView>

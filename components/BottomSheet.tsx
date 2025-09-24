@@ -1,3 +1,4 @@
+
 import React, { useEffect, useRef, useState } from 'react';
 import {
   View,
@@ -40,113 +41,148 @@ const SimpleBottomSheet: React.FC<SimpleBottomSheetProps> = ({
   const startPositionY = useRef(0);
 
   useEffect(() => {
-    if (isVisible) {
-      setCurrentSnapPoint(SNAP_POINTS.HALF);
-      gestureTranslateY.setValue(0);
-      Animated.parallel([
-        Animated.timing(translateY, {
-          toValue: SCREEN_HEIGHT - SNAP_POINTS.HALF,
-          duration: 300,
-          useNativeDriver: true,
-        }),
-        Animated.timing(backdropOpacity, {
-          toValue: 0.5,
-          duration: 300,
-          useNativeDriver: true,
-        }),
-      ]).start();
-    } else {
-      setCurrentSnapPoint(SNAP_POINTS.CLOSED);
-      gestureTranslateY.setValue(0);
-      Animated.parallel([
-        Animated.timing(translateY, {
-          toValue: SCREEN_HEIGHT,
-          duration: 250,
-          useNativeDriver: true,
-        }),
-        Animated.timing(backdropOpacity, {
-          toValue: 0,
-          duration: 250,
-          useNativeDriver: true,
-        }),
-      ]).start();
+    try {
+      if (isVisible) {
+        setCurrentSnapPoint(SNAP_POINTS.HALF);
+        gestureTranslateY.setValue(0);
+        Animated.parallel([
+          Animated.timing(translateY, {
+            toValue: SCREEN_HEIGHT - SNAP_POINTS.HALF,
+            duration: 300,
+            useNativeDriver: true,
+          }),
+          Animated.timing(backdropOpacity, {
+            toValue: 0.5,
+            duration: 300,
+            useNativeDriver: true,
+          }),
+        ]).start();
+      } else {
+        setCurrentSnapPoint(SNAP_POINTS.CLOSED);
+        gestureTranslateY.setValue(0);
+        Animated.parallel([
+          Animated.timing(translateY, {
+            toValue: SCREEN_HEIGHT,
+            duration: 250,
+            useNativeDriver: true,
+          }),
+          Animated.timing(backdropOpacity, {
+            toValue: 0,
+            duration: 250,
+            useNativeDriver: true,
+          }),
+        ]).start();
+      }
+    } catch (error) {
+      console.error('BottomSheet animation error:', error);
     }
   }, [isVisible, translateY, backdropOpacity]);
 
   const handleBackdropPress = () => {
-    onClose?.();
+    try {
+      onClose?.();
+    } catch (error) {
+      console.error('BottomSheet backdrop press error:', error);
+    }
   };
 
   const snapToPoint = (point: number) => {
-    setCurrentSnapPoint(point);
-    gestureTranslateY.setValue(0);
-    Animated.timing(translateY, {
-      toValue: SCREEN_HEIGHT - point,
-      duration: 300,
-      useNativeDriver: true,
-    }).start();
+    try {
+      setCurrentSnapPoint(point);
+      gestureTranslateY.setValue(0);
+      Animated.timing(translateY, {
+        toValue: SCREEN_HEIGHT - point,
+        duration: 300,
+        useNativeDriver: true,
+      }).start();
+    } catch (error) {
+      console.error('BottomSheet snap to point error:', error);
+    }
   };
 
   // Determines the closest snap point based on velocity and position
   const getClosestSnapPoint = (currentY: number, velocityY: number) => {
-    const currentPosition = SCREEN_HEIGHT - currentY;
+    try {
+      const currentPosition = SCREEN_HEIGHT - currentY;
 
-    if (velocityY > 1000) return SNAP_POINTS.CLOSED;
-    if (velocityY < -1000) return SNAP_POINTS.FULL;
+      if (velocityY > 1000) return SNAP_POINTS.CLOSED;
+      if (velocityY < -1000) return SNAP_POINTS.FULL;
 
-    const distances = [
-      { point: SNAP_POINTS.HALF, distance: Math.abs(currentPosition - SNAP_POINTS.HALF) },
-      { point: SNAP_POINTS.FULL, distance: Math.abs(currentPosition - SNAP_POINTS.FULL) },
-    ];
+      const distances = [
+        { point: SNAP_POINTS.HALF, distance: Math.abs(currentPosition - SNAP_POINTS.HALF) },
+        { point: SNAP_POINTS.FULL, distance: Math.abs(currentPosition - SNAP_POINTS.FULL) },
+      ];
 
-    if (currentPosition < SNAP_POINTS.HALF * 0.5) {
-      return SNAP_POINTS.CLOSED;
+      if (currentPosition < SNAP_POINTS.HALF * 0.5) {
+        return SNAP_POINTS.CLOSED;
+      }
+
+      distances.sort((a, b) => a.distance - b.distance);
+      return distances[0].point;
+    } catch (error) {
+      console.error('BottomSheet get closest snap point error:', error);
+      return SNAP_POINTS.HALF;
     }
-
-    distances.sort((a, b) => a.distance - b.distance);
-    return distances[0].point;
   };
 
   // Handles pan gesture events with boundary clamping
   const onGestureEvent = (event: any) => {
-    const { translationY } = event.nativeEvent;
-    lastGestureY.current = translationY;
+    try {
+      if (!event?.nativeEvent) {
+        console.warn('BottomSheet: Invalid gesture event');
+        return;
+      }
 
-    const currentBasePosition = SCREEN_HEIGHT - currentSnapPoint;
-    const intendedPosition = currentBasePosition + translationY;
+      const { translationY } = event.nativeEvent;
+      lastGestureY.current = translationY;
 
-    const minPosition = SCREEN_HEIGHT - SNAP_POINTS.FULL;
-    const maxPosition = SCREEN_HEIGHT;
-
-    const clampedPosition = Math.max(minPosition, Math.min(maxPosition, intendedPosition));
-    const clampedTranslation = clampedPosition - currentBasePosition;
-
-    gestureTranslateY.setValue(clampedTranslation);
-  };
-
-  // Handles gesture state changes (begin/end) for snapping behavior
-  const onHandlerStateChange = (event: any) => {
-    const { state, translationY, velocityY } = event.nativeEvent;
-
-    if (state === State.BEGAN) {
-      startPositionY.current = SCREEN_HEIGHT - currentSnapPoint;
-    } else if (state === State.END) {
       const currentBasePosition = SCREEN_HEIGHT - currentSnapPoint;
       const intendedPosition = currentBasePosition + translationY;
 
       const minPosition = SCREEN_HEIGHT - SNAP_POINTS.FULL;
       const maxPosition = SCREEN_HEIGHT;
 
-      const finalY = Math.max(minPosition, Math.min(maxPosition, intendedPosition));
-      const targetSnapPoint = getClosestSnapPoint(finalY, velocityY);
+      const clampedPosition = Math.max(minPosition, Math.min(maxPosition, intendedPosition));
+      const clampedTranslation = clampedPosition - currentBasePosition;
 
-      gestureTranslateY.setValue(0);
+      gestureTranslateY.setValue(clampedTranslation);
+    } catch (error) {
+      console.error('BottomSheet gesture event error:', error);
+    }
+  };
 
-      if (targetSnapPoint === SNAP_POINTS.CLOSED) {
-        onClose?.();
-      } else {
-        snapToPoint(targetSnapPoint);
+  // Handles gesture state changes (begin/end) for snapping behavior
+  const onHandlerStateChange = (event: any) => {
+    try {
+      if (!event?.nativeEvent) {
+        console.warn('BottomSheet: Invalid handler state change event');
+        return;
       }
+
+      const { state, translationY, velocityY } = event.nativeEvent;
+
+      if (state === State.BEGAN) {
+        startPositionY.current = SCREEN_HEIGHT - currentSnapPoint;
+      } else if (state === State.END) {
+        const currentBasePosition = SCREEN_HEIGHT - currentSnapPoint;
+        const intendedPosition = currentBasePosition + (translationY || 0);
+
+        const minPosition = SCREEN_HEIGHT - SNAP_POINTS.FULL;
+        const maxPosition = SCREEN_HEIGHT;
+
+        const finalY = Math.max(minPosition, Math.min(maxPosition, intendedPosition));
+        const targetSnapPoint = getClosestSnapPoint(finalY, velocityY || 0);
+
+        gestureTranslateY.setValue(0);
+
+        if (targetSnapPoint === SNAP_POINTS.CLOSED) {
+          onClose?.();
+        } else {
+          snapToPoint(targetSnapPoint);
+        }
+      }
+    } catch (error) {
+      console.error('BottomSheet handler state change error:', error);
     }
   };
 
@@ -233,7 +269,7 @@ const styles = StyleSheet.create({
   handle: {
     width: 40,
     height: 4,
-    backgroundColor: colors.grey || '#cccccc',
+    backgroundColor: colors.textSecondary || '#cccccc',
     borderRadius: 2,
     alignSelf: 'center',
     marginTop: 8,
