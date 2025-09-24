@@ -1,5 +1,5 @@
 
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -8,7 +8,8 @@ import {
   Modal,
   Animated,
   TouchableWithoutFeedback,
-  Dimensions
+  Dimensions,
+  Platform
 } from 'react-native';
 import { PanGestureHandler, State } from 'react-native-gesture-handler';
 import { colors } from '../styles/commonStyles';
@@ -76,17 +77,19 @@ const SimpleBottomSheet: React.FC<SimpleBottomSheetProps> = ({
     } catch (error) {
       console.error('BottomSheet animation error:', error);
     }
-  }, [isVisible, translateY, backdropOpacity]);
+  }, [isVisible, translateY, backdropOpacity, gestureTranslateY]);
 
-  const handleBackdropPress = () => {
+  const handleBackdropPress = useCallback(() => {
     try {
-      onClose?.();
+      if (onClose) {
+        onClose();
+      }
     } catch (error) {
       console.error('BottomSheet backdrop press error:', error);
     }
-  };
+  }, [onClose]);
 
-  const snapToPoint = (point: number) => {
+  const snapToPoint = useCallback((point: number) => {
     try {
       setCurrentSnapPoint(point);
       gestureTranslateY.setValue(0);
@@ -98,10 +101,10 @@ const SimpleBottomSheet: React.FC<SimpleBottomSheetProps> = ({
     } catch (error) {
       console.error('BottomSheet snap to point error:', error);
     }
-  };
+  }, [translateY, gestureTranslateY]);
 
   // Determines the closest snap point based on velocity and position
-  const getClosestSnapPoint = (currentY: number, velocityY: number) => {
+  const getClosestSnapPoint = useCallback((currentY: number, velocityY: number) => {
     try {
       const currentPosition = SCREEN_HEIGHT - currentY;
 
@@ -123,17 +126,24 @@ const SimpleBottomSheet: React.FC<SimpleBottomSheetProps> = ({
       console.error('BottomSheet get closest snap point error:', error);
       return SNAP_POINTS.HALF;
     }
-  };
+  }, []);
 
   // Handles pan gesture events with boundary clamping
-  const onGestureEvent = (event: any) => {
+  const onGestureEvent = useCallback((event: any) => {
     try {
       if (!event?.nativeEvent) {
-        console.warn('BottomSheet: Invalid gesture event');
+        console.log('BottomSheet: Invalid gesture event - skipping');
         return;
       }
 
       const { translationY } = event.nativeEvent;
+      
+      // Validate translationY is a number
+      if (typeof translationY !== 'number' || isNaN(translationY)) {
+        console.log('BottomSheet: Invalid translationY value - skipping');
+        return;
+      }
+
       lastGestureY.current = translationY;
 
       const currentBasePosition = SCREEN_HEIGHT - currentSnapPoint;
@@ -149,34 +159,45 @@ const SimpleBottomSheet: React.FC<SimpleBottomSheetProps> = ({
     } catch (error) {
       console.error('BottomSheet gesture event error:', error);
     }
-  };
+  }, [currentSnapPoint, gestureTranslateY]);
 
   // Handles gesture state changes (begin/end) for snapping behavior
-  const onHandlerStateChange = (event: any) => {
+  const onHandlerStateChange = useCallback((event: any) => {
     try {
       if (!event?.nativeEvent) {
-        console.warn('BottomSheet: Invalid handler state change event');
+        console.log('BottomSheet: Invalid handler state change event - skipping');
         return;
       }
 
       const { state, translationY, velocityY } = event.nativeEvent;
 
+      // Validate state
+      if (typeof state !== 'number') {
+        console.log('BottomSheet: Invalid state value - skipping');
+        return;
+      }
+
       if (state === State.BEGAN) {
         startPositionY.current = SCREEN_HEIGHT - currentSnapPoint;
       } else if (state === State.END) {
+        const safeTranslationY = typeof translationY === 'number' && !isNaN(translationY) ? translationY : 0;
+        const safeVelocityY = typeof velocityY === 'number' && !isNaN(velocityY) ? velocityY : 0;
+
         const currentBasePosition = SCREEN_HEIGHT - currentSnapPoint;
-        const intendedPosition = currentBasePosition + (translationY || 0);
+        const intendedPosition = currentBasePosition + safeTranslationY;
 
         const minPosition = SCREEN_HEIGHT - SNAP_POINTS.FULL;
         const maxPosition = SCREEN_HEIGHT;
 
         const finalY = Math.max(minPosition, Math.min(maxPosition, intendedPosition));
-        const targetSnapPoint = getClosestSnapPoint(finalY, velocityY || 0);
+        const targetSnapPoint = getClosestSnapPoint(finalY, safeVelocityY);
 
         gestureTranslateY.setValue(0);
 
         if (targetSnapPoint === SNAP_POINTS.CLOSED) {
-          onClose?.();
+          if (onClose) {
+            onClose();
+          }
         } else {
           snapToPoint(targetSnapPoint);
         }
@@ -184,7 +205,12 @@ const SimpleBottomSheet: React.FC<SimpleBottomSheetProps> = ({
     } catch (error) {
       console.error('BottomSheet handler state change error:', error);
     }
-  };
+  }, [currentSnapPoint, getClosestSnapPoint, onClose, snapToPoint, gestureTranslateY]);
+
+  // Don't render if not visible to avoid unnecessary DOM elements
+  if (!isVisible) {
+    return null;
+  }
 
   return (
     <Modal
@@ -192,6 +218,7 @@ const SimpleBottomSheet: React.FC<SimpleBottomSheetProps> = ({
       transparent
       animationType="none"
       statusBarTranslucent
+      onRequestClose={handleBackdropPress}
     >
       <View style={styles.container}>
         <TouchableWithoutFeedback onPress={handleBackdropPress}>
@@ -206,6 +233,7 @@ const SimpleBottomSheet: React.FC<SimpleBottomSheetProps> = ({
         <PanGestureHandler
           onGestureEvent={onGestureEvent}
           onHandlerStateChange={onHandlerStateChange}
+          enabled={Platform.OS !== 'web'} // Disable gestures on web to prevent warnings
         >
           <Animated.View
             style={[
@@ -225,11 +253,11 @@ const SimpleBottomSheet: React.FC<SimpleBottomSheetProps> = ({
                   <Text style={styles.title}>Bottom Sheet 🎉</Text>
                   <Text style={styles.description}>
                     This is a custom bottom sheet implementation.
-                    Try dragging it up and down!
+                    {Platform.OS !== 'web' && ' Try dragging it up and down!'}
                   </Text>
                   <Button
                     title="Close"
-                    onPress={onClose}
+                    onPress={handleBackdropPress}
                   />
                 </View>
               )}
@@ -257,14 +285,23 @@ const styles = StyleSheet.create({
     backgroundColor: colors.background || '#ffffff',
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: -3,
-    },
-    shadowOpacity: 0.27,
-    shadowRadius: 4.65,
-    elevation: 6,
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: {
+          width: 0,
+          height: -3,
+        },
+        shadowOpacity: 0.27,
+        shadowRadius: 4.65,
+      },
+      android: {
+        elevation: 6,
+      },
+      web: {
+        boxShadow: '0px -3px 12px rgba(0, 0, 0, 0.15)',
+      },
+    }),
   },
   handle: {
     width: 40,

@@ -213,8 +213,38 @@ export const setupErrorLogging = () => {
       const sourceInfo = extractSourceLocation(stack);
       const callerInfo = getCallerInfo();
 
+      // Filter out common React Native warnings that are not actionable
+      const message = args.join(' ');
+      const ignoredWarnings = [
+        'VirtualizedLists should never be nested',
+        'componentWillReceiveProps has been renamed',
+        'componentWillMount has been renamed',
+        'componentWillUpdate has been renamed',
+        'Failed prop type',
+        'Warning: React.createElement',
+        'Warning: validateDOMNesting',
+        'Warning: Each child in a list should have a unique "key" prop',
+        'Require cycle:',
+        'Remote debugger',
+        'Animated: `useNativeDriver`',
+        'Possible Unhandled Promise Rejection',
+        'Setting a timer for a long period of time',
+        'Non-serializable values were found in the navigation state'
+      ];
+
+      // Check if this is a warning we should ignore
+      const shouldIgnore = ignoredWarnings.some(ignored => 
+        message.toLowerCase().includes(ignored.toLowerCase())
+      );
+
+      if (shouldIgnore) {
+        // Still log to console but don't send to parent
+        originalConsoleWarn('⚠️ WARNING (filtered):', new Date().toISOString(), message);
+        return;
+      }
+
       // Create enhanced message with source information
-      const enhancedMessage = args.join(' ') + sourceInfo + callerInfo;
+      const enhancedMessage = message + sourceInfo + callerInfo;
 
       originalConsoleWarn('⚠️ WARNING:', new Date().toISOString(), enhancedMessage);
 

@@ -22,50 +22,110 @@ export default function TaskCard({
   showUser = true 
 }: TaskCardProps) {
   const getStatusColor = (): string => {
-    if (task.isCompleted) return colors.success;
-    if (task.dueDate < new Date()) return colors.error;
-    return colors.warning;
+    try {
+      if (task.isCompleted) return colors.success;
+      if (task.dueDate && task.dueDate < new Date()) return colors.error;
+      return colors.warning;
+    } catch (error) {
+      console.error('Error getting task status color:', error);
+      return colors.textSecondary;
+    }
   };
 
   const getStatusText = (): string => {
-    if (task.isCompleted) return 'Completed';
-    if (task.dueDate < new Date()) return 'Overdue';
-    return 'Pending';
+    try {
+      if (task.isCompleted) return 'Completed';
+      if (task.dueDate && task.dueDate < new Date()) return 'Overdue';
+      return 'Pending';
+    } catch (error) {
+      console.error('Error getting task status text:', error);
+      return 'Unknown';
+    }
   };
 
   const getPriorityColor = (): string => {
-    switch (task.priority) {
-      case 'high': return colors.error;
-      case 'medium': return colors.warning;
-      case 'low': return colors.textSecondary;
-      default: return colors.textSecondary;
+    try {
+      switch (task.priority) {
+        case 'high': return colors.error;
+        case 'medium': return colors.warning;
+        case 'low': return colors.textSecondary;
+        default: return colors.textSecondary;
+      }
+    } catch (error) {
+      console.error('Error getting priority color:', error);
+      return colors.textSecondary;
     }
   };
 
   const formatDueDate = (): string => {
-    const now = new Date();
-    const due = task.dueDate;
-    const diffInHours = Math.abs(due.getTime() - now.getTime()) / (1000 * 60 * 60);
-    
-    if (diffInHours < 1) {
-      const minutes = Math.round(diffInHours * 60);
-      return `${minutes}m`;
-    } else if (diffInHours < 24) {
-      return `${Math.round(diffInHours)}h`;
-    } else {
-      const days = Math.round(diffInHours / 24);
-      return `${days}d`;
+    try {
+      if (!task.dueDate || !(task.dueDate instanceof Date)) {
+        return 'No due date';
+      }
+
+      const now = new Date();
+      const due = task.dueDate;
+      const diffInMs = Math.abs(due.getTime() - now.getTime());
+      const diffInHours = diffInMs / (1000 * 60 * 60);
+      
+      if (diffInHours < 1) {
+        const minutes = Math.round(diffInHours * 60);
+        return `${minutes}m`;
+      } else if (diffInHours < 24) {
+        return `${Math.round(diffInHours)}h`;
+      } else {
+        const days = Math.round(diffInHours / 24);
+        return `${days}d`;
+      }
+    } catch (error) {
+      console.error('Error formatting due date:', error);
+      return 'Invalid date';
     }
   };
 
   const getCategoryIcon = (): keyof typeof import('@expo/vector-icons').Ionicons.glyphMap => {
-    switch (task.category) {
-      case 'chores': return 'home-outline';
-      case 'homework': return 'book-outline';
-      case 'personal': return 'person-outline';
-      default: return 'list-outline';
+    try {
+      switch (task.category) {
+        case 'chores': return 'home-outline';
+        case 'homework': return 'book-outline';
+        case 'personal': return 'person-outline';
+        default: return 'list-outline';
+      }
+    } catch (error) {
+      console.error('Error getting category icon:', error);
+      return 'list-outline';
     }
   };
+
+  const handlePress = () => {
+    try {
+      if (onPress) {
+        onPress();
+      }
+    } catch (error) {
+      console.error('Error handling task card press:', error);
+    }
+  };
+
+  const handleComplete = () => {
+    try {
+      if (onComplete) {
+        onComplete();
+      }
+    } catch (error) {
+      console.error('Error handling task completion:', error);
+    }
+  };
+
+  // Validate required props
+  if (!task || !task.id) {
+    console.error('TaskCard: Invalid task prop provided');
+    return (
+      <View style={commonStyles.card}>
+        <Text style={commonStyles.textSecondary}>Invalid task data</Text>
+      </View>
+    );
+  }
 
   return (
     <TouchableOpacity
@@ -77,7 +137,7 @@ export default function TaskCard({
           opacity: task.isCompleted ? 0.7 : 1,
         }
       ]}
-      onPress={onPress}
+      onPress={handlePress}
       activeOpacity={0.7}
     >
       <View style={commonStyles.spaceBetween}>
@@ -97,7 +157,7 @@ export default function TaskCard({
                 flex: 1,
               }
             ]}>
-              {task.title}
+              {task.title || 'Untitled Task'}
             </Text>
           </View>
           
@@ -118,7 +178,7 @@ export default function TaskCard({
               <View style={[commonStyles.row, { marginRight: 12 }]}>
                 <UserAvatar user={user} size={20} />
                 <Text style={[commonStyles.textSecondary, { marginLeft: 6, fontSize: 12 }]}>
-                  {user.name}
+                  {user.name || 'Unknown User'}
                 </Text>
               </View>
             )}
@@ -139,11 +199,11 @@ export default function TaskCard({
                 commonStyles.textSecondary,
                 { marginLeft: 4, fontSize: 12, color: getPriorityColor() }
               ]}>
-                {task.priority}
+                {task.priority || 'medium'}
               </Text>
             </View>
 
-            {task.points && (
+            {task.points && typeof task.points === 'number' && task.points > 0 && (
               <View style={[commonStyles.row, { marginRight: 12 }]}>
                 <Icon name="star-outline" size={12} color={colors.accent} />
                 <Text style={[
@@ -184,7 +244,7 @@ export default function TaskCard({
               justifyContent: 'center',
               marginLeft: 12,
             }}
-            onPress={onComplete}
+            onPress={handleComplete}
           >
             <Icon name="checkmark" size={16} color={colors.backgroundAlt} />
           </TouchableOpacity>

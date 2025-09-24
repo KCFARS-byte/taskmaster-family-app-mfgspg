@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   ScrollView,
   Alert,
+  Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -50,6 +51,19 @@ export default function AddTask() {
         return;
       }
 
+      // Validate points input
+      const pointsValue = parseInt(points);
+      if (isNaN(pointsValue) || pointsValue < 0) {
+        Alert.alert('Error', 'Points must be a valid number greater than or equal to 0');
+        return;
+      }
+
+      // Validate due date
+      if (!dueDate || !(dueDate instanceof Date) || isNaN(dueDate.getTime())) {
+        Alert.alert('Error', 'Please select a valid due date');
+        return;
+      }
+
       const newTask = taskStore.addTask({
         title: title.trim(),
         description: description.trim() || undefined,
@@ -60,7 +74,7 @@ export default function AddTask() {
         repeatType,
         category,
         priority,
-        points: parseInt(points) || 0,
+        points: pointsValue,
       });
 
       console.log('Task created successfully:', newTask.title);
@@ -86,11 +100,29 @@ export default function AddTask() {
   const handleDateChange = (event: any, selectedDate?: Date) => {
     try {
       setShowDatePicker(false);
-      if (selectedDate) {
+      if (selectedDate && selectedDate instanceof Date && !isNaN(selectedDate.getTime())) {
         setDueDate(selectedDate);
       }
     } catch (error) {
       console.error('Error handling date change:', error);
+    }
+  };
+
+  const handlePointsChange = (text: string) => {
+    try {
+      // Only allow numeric input
+      const numericText = text.replace(/[^0-9]/g, '');
+      setPoints(numericText);
+    } catch (error) {
+      console.error('Error handling points change:', error);
+    }
+  };
+
+  const handleBackPress = () => {
+    try {
+      router.back();
+    } catch (error) {
+      console.error('Error navigating back:', error);
     }
   };
 
@@ -114,17 +146,26 @@ export default function AddTask() {
     { value: 'high', label: 'High', color: colors.error },
   ];
 
+  const formatDateTime = (date: Date): string => {
+    try {
+      if (!date || !(date instanceof Date) || isNaN(date.getTime())) {
+        return 'Invalid date';
+      }
+      
+      const dateStr = date.toLocaleDateString();
+      const timeStr = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      return `${dateStr} at ${timeStr}`;
+    } catch (error) {
+      console.error('Error formatting date time:', error);
+      return 'Invalid date';
+    }
+  };
+
   return (
     <SafeAreaView style={commonStyles.container}>
       <View style={commonStyles.header}>
         <View style={commonStyles.spaceBetween}>
-          <TouchableOpacity onPress={() => {
-            try {
-              router.back();
-            } catch (error) {
-              console.error('Error navigating back:', error);
-            }
-          }}>
+          <TouchableOpacity onPress={handleBackPress}>
             <Icon name="arrow-back" size={24} color={colors.text} />
           </TouchableOpacity>
           <Text style={commonStyles.title}>Add Task</Text>
@@ -152,6 +193,7 @@ export default function AddTask() {
             onChangeText={setTitle}
             placeholder="Enter task title..."
             placeholderTextColor={colors.textSecondary}
+            maxLength={100}
           />
         </View>
 
@@ -177,6 +219,7 @@ export default function AddTask() {
             placeholder="Enter task description..."
             placeholderTextColor={colors.textSecondary}
             multiline
+            maxLength={500}
           />
         </View>
 
@@ -230,7 +273,7 @@ export default function AddTask() {
           >
             <Icon name="calendar-outline" size={20} color={colors.textSecondary} />
             <Text style={[commonStyles.text, { marginLeft: 12 }]}>
-              {dueDate.toLocaleDateString()} at {dueDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+              {formatDateTime(dueDate)}
             </Text>
           </TouchableOpacity>
         </View>
@@ -357,10 +400,11 @@ export default function AddTask() {
               }
             ]}
             value={points}
-            onChangeText={setPoints}
+            onChangeText={handlePointsChange}
             placeholder="10"
             placeholderTextColor={colors.textSecondary}
             keyboardType="numeric"
+            maxLength={3}
           />
         </View>
 
@@ -380,8 +424,9 @@ export default function AddTask() {
         <DateTimePicker
           value={dueDate}
           mode="datetime"
-          display="default"
+          display={Platform.OS === 'ios' ? 'spinner' : 'default'}
           onChange={handleDateChange}
+          minimumDate={new Date()}
         />
       )}
     </SafeAreaView>
